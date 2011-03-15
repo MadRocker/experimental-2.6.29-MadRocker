@@ -1,0 +1,10 @@
+#
+# Configuration for CMM 
+#
+
+config CMM
+	bool "Samsung CMM Driver" 
+	default n
+	---help---
+	  This is a CMM driver for Samsung S3C6410.
+

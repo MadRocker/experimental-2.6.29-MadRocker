@@ -1,0 +1,6 @@
+Changed build.sh and Makefile toolchain to my locations.
+
+Current status = defaults experimental-2.6.29-dopi.
+
+Added arch/arm/Kconfig lzma option.
+Added M910 drivers/media/s3c6410 fimg 3D ect files.

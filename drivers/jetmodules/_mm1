@@ -1,0 +1,6 @@
+#!/bin/sh
+
+make KDIR=${HOME}/JetDroid/JetKernel CFLAGS=-O3
+mkdir -p ${HOME}/JetDroid/JetKernel/arch/arm/boot/modules 
+cp *.ko ${HOME}/JetDroid/JetKernel/arch/arm/boot/modules
+

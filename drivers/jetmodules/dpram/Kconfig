@@ -1,0 +1,10 @@
+#
+# Configuration for Dpram
+#
+
+config DPRAM
+	bool "Samsung Dpram Driver" 
+	default n
+	---help---
+	  This is a Dpram driver for Samsung S3C6410 and S5P6440.
+

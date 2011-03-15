@@ -1,0 +1,4 @@
+To build : ./MakeModules
+
+Note that this script expects ${HOME}/JetDroid/JetKernel to be available.
+

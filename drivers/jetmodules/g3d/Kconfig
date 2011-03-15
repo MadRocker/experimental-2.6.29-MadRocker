@@ -1,0 +1,10 @@
+#
+# Configuration for G-3D
+#
+
+config G3D
+	bool "Samsung G-3D Driver" 
+	default n
+	---help---
+	  This is a G-3D(3D accelerator) driver for Samsung S3C6410 and S5PC100.
+

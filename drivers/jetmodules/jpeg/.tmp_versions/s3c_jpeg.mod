@@ -1,0 +1,2 @@
+/home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/s3c_jpeg.ko
+/home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/LogMsg.o /home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/JPGOpr.o /home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/JPGMisc.o /home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/JPGMem.o /home/kaustubh/JetDroid/SPH_M900_MR3_Kernel/src/modules/jpeg/s3c-jpeg.o

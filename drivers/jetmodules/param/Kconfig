@@ -1,0 +1,10 @@
+#
+# Configuration for PARAM 
+#
+
+config PARAM
+	bool "Samsung PARAM Driver" 
+	default n
+	---help---
+	  This is a PARAM driver for Samsung S3C6410.
+

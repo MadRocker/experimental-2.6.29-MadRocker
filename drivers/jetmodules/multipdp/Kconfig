@@ -1,0 +1,10 @@
+#
+# Configuration for MULTIPDP 
+#
+
+config MULTIPDP
+	bool "Samsung MULTIPDP Driver" 
+	default m
+	---help---
+	  This is a MULTIPDP driver for Samsung S3C6410.
+

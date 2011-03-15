@@ -1,0 +1,10 @@
+#
+# Configuration for Vibrator
+#
+
+config VIBETONZ
+	bool "Samsung Vibrator Driver" 
+	default n
+	---help---
+	  This is a Vibrator driver for Samsung S3C6410.
+

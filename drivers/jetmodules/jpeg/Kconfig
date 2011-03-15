@@ -1,0 +1,10 @@
+#
+# Configuration for G-3D
+#
+
+config JPEG
+	bool "Samsung JPEG Driver" 
+	default n
+	---help---
+	  This is a JPEG driver for Samsung S3C6410 and S5PC100.
+

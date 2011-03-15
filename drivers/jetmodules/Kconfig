@@ -1,0 +1,55 @@
+menuconfig JET_MODULES
+	bool "JetDroid Modules"
+	default y
+	---help---
+	  This are various modules for the s3c6410 processor.
+
+if JET_MODULES
+
+source "drivers/jetmodules/post/Kconfig"
+source "drivers/jetmodules/mfc/Kconfig"
+source "drivers/jetmodules/jpeg/Kconfig"
+source "drivers/jetmodules/rotator/Kconfig"
+source "drivers/jetmodules/g2d/Kconfig"
+source "drivers/jetmodules/g3d/Kconfig"
+source "drivers/jetmodules/cmm/Kconfig"
+source "drivers/jetmodules/xsr/Kconfig"
+source "drivers/jetmodules/rfs/Kconfig"
+source "drivers/jetmodules/dpram/Kconfig"
+source "drivers/jetmodules/vibetonz/Kconfig"
+source "drivers/jetmodules/btgpio/Kconfig"
+source "drivers/jetmodules/multipdp/Kconfig"
+source "drivers/jetmodules/param/Kconfig"
+#source "drivers/jetmodules/camera/Kconfig"
+
+comment "Reserved memory configurations"
+
+config VIDEO_SAMSUNG_MEMSIZE_FIMC
+	int "Memory size in kbytes for FIMC"
+	depends on VIDEO_FIMC
+	default "10240"
+
+config SAMSUNG_MEMSIZE_POST
+	int "Memory size in kbytes for Post Processor"
+	depends on POST
+	default "8192"
+
+config SAMSUNG_MEMSIZE_TV
+	int "Memory size in kbytes for TV"
+	depends on TV
+	default "8192"
+
+if CPU_S3C6410
+config SAMSUNG_MEMSIZE_MFC
+	int "Memory size in kbytes for MFC"
+	depends on MFC
+	default "6144"
+
+config SAMSUNG_MEMSIZE_JPEG
+	int "Memory size in kbytes for JPEG"
+	depends on JPEG 
+	default "4096"
+endif
+
+endif # JET_MODULES
+

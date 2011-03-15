@@ -1,0 +1,75 @@
+#!/bin/sh
+
+cd xsr
+../_mm1
+cd ..
+
+cd rfs
+../_mm1
+cd ..
+
+cd btgpio
+../_mm1
+cd ..
+
+cd mfc
+../_mm1
+cd ..
+
+cd wlan
+../_mm1
+cd ..
+
+cd btgpio
+../_mm1
+cd ..
+
+cd dpram
+../_mm1
+cd ..
+
+cd multipdp
+../_mm1
+cd ..
+
+cd pp
+../_mm1
+cd ..
+
+cd camera
+../_mm1
+cd ..
+
+cd cmm
+../_mm1
+cd ..
+
+cd g2d
+../_mm1
+cd ..
+
+cd g3d
+../_mm1
+cd ..
+
+cd jpeg
+../_mm1
+cd ..
+
+cd param
+../_mm1
+cd ..
+
+cd rotator
+../_mm1
+cd ..
+
+cd vibetonz
+../_mm1
+cd ..
+
+echo ""
+echo "Modules are copied to ${HOME}/JetDroid/JetKernel/arch/arm/boot/modules"
+echo "You should copy this modules to your JetDroid directory /system/lib/modules"
+echo ""
+

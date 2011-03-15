@@ -1,0 +1,10 @@
+#
+# Configuration for G-2D
+#
+
+config G2D
+	bool "Samsung G-2D Driver" 
+	default n
+	---help---
+	  This is a G-2D(2D accelerator) driver for Samsung S3C6410 and S5PC100.
+

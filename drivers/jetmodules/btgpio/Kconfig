@@ -1,0 +1,10 @@
+#
+# Configuration for BT_GPIO 
+#
+
+config BT_GPIO
+	bool "Samsung BT_GPIO Driver" 
+	default n
+	---help---
+	  This is a BT_GPIO driver for Samsung S3C6410.
+
