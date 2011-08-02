@@ -1,0 +1,10 @@
+#
+# Configuration for Post Porcessor
+#
+
+config POST
+	bool "Samsung Post Processor Driver" 
+	default n
+	---help---
+	  This is a post processor driver for Samsung S3C6410 and S5P6440.
+

@@ -107,6 +107,6 @@ obj-$(CONFIG_OF)		+= of/
 obj-$(CONFIG_SSB)		+= ssb/
 obj-$(CONFIG_VIRTIO)		+= virtio/
 obj-$(CONFIG_STAGING)		+= staging/
-obj-y				+= platform/
-obj-y				+= jetmodules/
+obj-$(CONFIG_PLATFORM)		+= platform/
+obj-$(CONFIG_JET)		+= jet/
 

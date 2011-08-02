@@ -392,7 +392,7 @@ config VIDEO_VPX3220
 
 comment "Video and audio decoders"
 
-source "drivers/media/video/cx25840/Kconfig"
+##source "drivers/media/video/cx25840/Kconfig"
 
 comment "MPEG video encoders"
 

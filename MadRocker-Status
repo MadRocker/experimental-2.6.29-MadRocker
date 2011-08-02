@@ -1,3 +1,12 @@
+Changed s3c6410 drivers to /drivers/jet and made then as inbuilt instead of modules.
+Camera, xsr, rfs, param, dpram is still buggy, there is a fix for dpram.
+
+dhd-wlan moved to /drivers/jet from staging.
+Added wimax to /drivers/jet
+Post processor default is "/drivers/jet/pp" instead of post, think there was somethign that needed fixing in post folder.
+MAX9880 tried to use ac97+MAX9880 with extra kernel.log and androdi output for other devices.
+
+OLD:
 Changed build.sh and Makefile toolchain to my locations.
 
 Current status = defaults experimental-2.6.29-dopi.

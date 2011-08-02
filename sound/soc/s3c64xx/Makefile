@@ -43,7 +43,6 @@ obj-$(CONFIG_SND_SMDKC100_S5M8751) += snd-soc-smdkc100-s5m8751.o
 obj-$(CONFIG_SND_SMDKC100_WM8580)  += snd-soc-smdkc100-wm8580.o
 obj-$(CONFIG_SND_SMDKC100_WM9713)  += snd-soc-smdkc100-wm9713.o
 
-# S3C6410 has AK4671 and I2S(v-3.2 and 4.0) controller.
+# S3C6410 has AC97 and I2S(v-3.2 and 4.0) controller.
 obj-$(CONFIG_SND_S3C64XX_SOC_AK4671) += snd-soc-ak4671.o
-
 obj-$(CONFIG_SND_S3C64XX_SOC_MAX9880) += snd-soc-s3c6410-max9880.o

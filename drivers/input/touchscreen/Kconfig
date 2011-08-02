@@ -92,7 +92,7 @@ config TOUCHSCREEN_MELFAS_FIRMWARE_UPDATE
 config TOUCHSCREEN_S3C
 	tristate "S3C touchscreen driver"
 	depends on ARCH_S3C2410 || ARCH_S3C64XX
-	default n
+	default y
 	help
 	  Say Y here to enable the driver for the touchscreen on the
 	  S3C SMDK board.
@@ -105,7 +105,7 @@ config TOUCHSCREEN_S3C
 config TOUCHSCREEN_JET
     bool "Jet semi-flip touch"
 	depends on TOUCHSCREEN_S3C
-	default n
+	default y
 	help
 	  Say Y here to enable the driver for the touchscreen on the
 	  GT-S8000 Jet phone. (flipped-x, normal-y)

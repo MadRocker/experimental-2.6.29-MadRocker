@@ -1332,7 +1332,7 @@ source "drivers/staging/Kconfig"
 
 source "drivers/sensor/Kconfig"
 
-source "drivers/jetmodules/Kconfig"
+source "drivers/jet/Kconfig"
 
 endmenu
 

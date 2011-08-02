@@ -191,7 +191,8 @@ SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 # Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
 export KBUILD_BUILDHOST := $(SUBARCH)
 ARCH			:= arm
-CROSS_COMPILE	:= /home/aa/JetDroid/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+CROSS_COMPILE	:= /home/madrocker/Desktop/JetDroid1/toolchain/arm-eabi-4.4.3/bin/arm-eabi-
+#CROSS_COMPILE	:= /home/madrocker/Desktop/JetDroid1/toolchain/arm-none-eabi-gcc-4.5.2/bin/arm-none-eabi-
 #CROSS_COMPILE	:= $(shell if [ -f .cross_compile ]; then \
 					cat .cross_compile; \
 					fi)
