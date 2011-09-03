@@ -2,7 +2,7 @@ config VIDEO_SAMSUNG
 	bool "Samsung Multimedia Devices"
 	depends on VIDEO_CAPTURE_DRIVERS && VIDEO_V4L2
 	select VIDEO_FIXED_MINOR_RANGES
-	default n
+	default y
 	---help---
 	  This is a representative video4linux configuration for Samsung multimedia devices.
 
@@ -16,26 +16,32 @@ config VIDEO_SAMSUNG_V4L2
 source "drivers/media/video/samsung/fimc/Kconfig"
 #source "drivers/media/video/samsung/post/Kconfig"
 
-if CPU_S5PC100 || CPU_S5PC110 
-source "drivers/media/video/samsung/tv20_ap/Kconfig"
-source "drivers/media/video/samsung/jpeg_v2/Kconfig"
-source "drivers/media/video/samsung/tsi/Kconfig"
-endif
-
-if CPU_S5PC100
-source "drivers/media/video/samsung/mfc40/Kconfig"
-source "drivers/media/video/samsung/rotator/Kconfig"
-endif
-
-#if CPU_S3C6410
-#source "drivers/media/video/samsung/mfc10/Kconfig"
-#source "drivers/media/video/samsung/jpeg/Kconfig"
-#source "drivers/media/video/samsung/tv/Kconfig"
+#if CPU_S5PC100 || CPU_S5PC110 
+#source "drivers/media/video/samsung/tv20_ap/Kconfig"
+#source "drivers/media/video/samsung/jpeg_v2/Kconfig"
+#source "drivers/media/video/samsung/tsi/Kconfig"
 #endif
 
-if CPU_S5PC110
-source "drivers/media/video/samsung/mfc50/Kconfig"
+#if CPU_S5PC100
+#source "drivers/media/video/samsung/mfc40/Kconfig"
+#source "drivers/media/video/samsung/rotator/Kconfig"
+#endif
+
+if CPU_S3C6410
+source "drivers/media/video/samsung/fimc/Kconfig"
+source "drivers/media/video/samsung/g2d/Kconfig"
+source "drivers/media/video/samsung/g3d/Kconfig"
+source "drivers/media/video/samsung/jpeg_v2/Kconfig"
+source "drivers/media/video/samsung/mfc40/Kconfig"
+source "drivers/media/video/samsung/rotator/Kconfig"
+source "drivers/media/video/samsung/scaler/Kconfig"
+source "drivers/media/video/samsung/tsi/Kconfig"
+source "drivers/media/video/samsung/tvout/Kconfig"
 endif
+
+#if CPU_S5PC110
+#source "drivers/media/video/samsung/mfc50/Kconfig"
+#endif
 #
 #source "drivers/media/video/samsung/rotator/Kconfig"
 #source "drivers/media/video/samsung/g2d/Kconfig"

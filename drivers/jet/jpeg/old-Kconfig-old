@@ -1,0 +1,17 @@
+#
+# Configuration for JPEG
+#
+
+config VIDEO_JPEG_V2
+	bool "Samsung JPEG driver"
+	depends on VIDEO_S3C6410
+	default y
+	---help---
+	  This is a JPEG for Samsung S3C6410
+
+config VIDEO_JPEG_DEBUG
+	bool "print JPEG debug message"
+	depends on VIDEO_JPEG_V2
+	default n
+
+

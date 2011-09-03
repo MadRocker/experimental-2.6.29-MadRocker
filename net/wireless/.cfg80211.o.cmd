@@ -1,0 +1,1 @@
+cmd_net/wireless/cfg80211.o := /home/madrocker/Desktop/JetDroid1/toolchain/arm-eabi-4.4.3/bin/arm-eabi-ld -EL    -r -o net/wireless/cfg80211.o net/wireless/core.o net/wireless/sysfs.o net/wireless/radiotap.o net/wireless/util.o net/wireless/reg.o net/wireless/wext-compat.o net/wireless/nl80211.o 

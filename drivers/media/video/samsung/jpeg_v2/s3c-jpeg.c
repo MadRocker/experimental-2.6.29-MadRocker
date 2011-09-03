@@ -1,14 +1,14 @@
 /* linux/drivers/media/video/samsung/jpeg_v2/s3c-jpeg.c
  *
- * Driver file for Samsung JPEG Encoder/Decoder
+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+ * http://www.samsung.com/
  *
- * Peter Oh,Hyunmin kwak, Copyright (c) 2009 Samsung Electronics
- * 	http://www.samsungsemi.com/
+ * Core file for Samsung Jpeg Interface driver
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
- */
+*/
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -29,9 +29,14 @@
 #include <linux/init.h>
 #include <asm/io.h>
 #include <asm/page.h>
-#include <mach/irqs.h>
+#if defined CONFIG_S5PV210_VICTORY
+#include <mach/victory/irqs.h>
+#elif defined CONFIG_S5PV210_ATLAS
+#include <mach/atlas/irqs.h>
+#endif
 #include <linux/semaphore.h>
-#include <plat/map.h>
+#include <mach/map.h>
+#include <mach/pd.h>
 #include <linux/miscdevice.h>
 #include <linux/vmalloc.h>
 #include <linux/string.h>
@@ -39,9 +44,7 @@
 #include <linux/platform_device.h>
 
 #include <linux/version.h>
-#include <plat/regs-clock.h>
 #include <plat/media.h>
-
 
 #include <linux/time.h>
 #include <linux/clk.h>
@@ -50,14 +53,9 @@
 #include "jpg_mem.h"
 #include "jpg_misc.h"
 #include "jpg_opr.h"
-#include "log_msg.h"
 #include "regs-jpeg.h"
 
-#ifdef CONFIG_CPU_S5PC100
-static struct clk		*jpeg_hclk;
-static struct clk		*jpeg_sclk;
-#endif
-static struct clk               *s3c_jpeg_clk;
+static struct clk		*s3c_jpeg_clk;
 
 static struct resource		*s3c_jpeg_mem;
 void __iomem			*s3c_jpeg_base;
@@ -65,63 +63,9 @@ static int			irq_no;
 static int			instanceNo = 0;
 volatile int			jpg_irq_reason;
 wait_queue_head_t 		wait_queue_jpeg;
-/* added by padma */
-/* to save JPEG frame buffer physical address */
-static UINT32		        frmbuf_addr;
-static int                      get_vaddr = 0;
-static jpg_mod			j_mod;
 
-//#define JPG_DEBUG 
-#undef JPG_DEBUG
-
-#ifdef JPG_DEBUG
-#define printk(x...) printk(x)
-#else
-#define  printk(x...)
-#endif
 
 DECLARE_WAIT_QUEUE_HEAD(WaitQueue_JPEG);
-#ifdef CONFIG_CPU_S5PC100
-irqreturn_t s3c_jpeg_irq(int irq, void *dev_id)
-{
-	unsigned int	int_status;
-	unsigned int	status;
-
-	log_msg(LOG_TRACE, "s3c_jpeg_irq", "=====enter s3c_jpeg_irq===== \r\n");
-
-	int_status = readl(s3c_jpeg_base + S3C_JPEG_INTST_REG);
-	status = readl(s3c_jpeg_base + S3C_JPEG_OPR_REG);
-	log_msg(LOG_TRACE, "s3c_jpeg_irq", "int_status : 0x%08x status : 0x%08x\n", int_status, status);
-
-	if (int_status) {
-		int_status &= ((1 << 6) | (1 << 4) | (1 << 3));
-
-		switch (int_status) {
-		case 0x08 :
-			jpg_irq_reason = OK_HD_PARSING;
-			break;
-		case 0x00 :
-			jpg_irq_reason = ERR_HD_PARSING;
-			break;
-		case 0x40 :
-			jpg_irq_reason = OK_ENC_OR_DEC;
-			break;
-		case 0x10 :
-			jpg_irq_reason = ERR_ENC_OR_DEC;
-			break;
-		default :
-			jpg_irq_reason = ERR_UNKNOWN;
-		}
-
-		wake_up_interruptible(&wait_queue_jpeg);
-	} else {
-		jpg_irq_reason = ERR_UNKNOWN;
-		wake_up_interruptible(&wait_queue_jpeg);
-	}
-
-	return IRQ_HANDLED;
-}
-#else //CONFIG_CPU_S5PC110
 irqreturn_t s3c_jpeg_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned int	int_status;
@@ -137,7 +81,6 @@ irqreturn_t s3c_jpeg_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 	writel(S3C_JPEG_COM_INT_RELEASE, s3c_jpeg_base + S3C_JPEG_COM_REG);
 	jpg_dbg("int_status : 0x%08x status : 0x%08x\n", int_status, status);
-	printk("int_status : 0x%08x status : 0x%08x\n", int_status, status);
 
 	if (int_status) {
 		switch (int_status) {
@@ -159,16 +102,20 @@ irqreturn_t s3c_jpeg_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 	return IRQ_HANDLED;
 }
-#endif
 static int s3c_jpeg_open(struct inode *inode, struct file *file)
 {
 	sspc100_jpg_ctx *jpg_reg_ctx;
 	DWORD	ret;
-#ifdef CONFIG_CPU_S5PC100
-	clk_enable(jpeg_hclk);
-	clk_enable(jpeg_sclk);
-#endif
 
+	ret = s5pv210_pd_enable("jpeg_pd");
+	if (ret < 0) {
+		jpg_err("failed to enable jpeg power domain\n");
+		return FALSE;
+	}
+	
+        /* clock enable */
+	clk_enable(s3c_jpeg_clk);
+	
 	jpg_dbg("JPG_open \r\n");
 
 	jpg_reg_ctx = (sspc100_jpg_ctx *)mem_alloc(sizeof(sspc100_jpg_ctx));
@@ -227,11 +174,15 @@ static int s3c_jpeg_release(struct inode *inode, struct file *file)
 
 	unlock_jpg_mutex();
 	kfree(jpg_reg_ctx);
-#ifdef CONFIG_CPU_S5PC100
-	clk_disable(jpeg_hclk);
-	clk_disable(jpeg_sclk);
-#endif
-	log_msg(LOG_TRACE, "s3c_jpeg_release end ", "JPG_Close\n");
+
+/* clock disable */
+	clk_disable(s3c_jpeg_clk);
+	ret = s5pv210_pd_disable("jpeg_pd");
+	if (ret < 0) {
+		jpg_err("failed to disable jpeg power domain\n");
+		return FALSE;
+	}
+
 	return 0;
 }
 
@@ -245,6 +196,7 @@ static ssize_t s3c_jpeg_read(struct file *file, char *buf, size_t count, loff_t 
 {
 	return 0;
 }
+
 static int s3c_jpeg_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	static sspc100_jpg_ctx		*jpg_reg_ctx;
@@ -295,11 +247,6 @@ static int s3c_jpeg_ioctl(struct inode *inode, struct file *file, unsigned int c
 
 		if (param.enc_param->enc_type == JPG_MAIN) {
 			jpg_reg_ctx->jpg_data_addr = (UINT32)jpg_data_base_addr ;
-			/* added by padma */
-                        /* user can set the frame buffer address */
-			if(param.enc_param->set_framebuf == 1)
-				jpg_reg_ctx->img_data_addr = frmbuf_addr;
-			else  /* frame buffer address 0X0000 */                     
 			jpg_reg_ctx->img_data_addr = (UINT32)jpg_data_base_addr
 							+ JPG_STREAM_BUF_SIZE
 							+ JPG_STREAM_THUMB_BUF_SIZE;
@@ -308,56 +255,38 @@ static int s3c_jpeg_ioctl(struct inode *inode, struct file *file, unsigned int c
 
 			result = encode_jpg(jpg_reg_ctx, param.enc_param);
 		} else {
-			jpg_reg_ctx->img_thumb_data_addr = (UINT32)jpg_data_base_addr + SHARED_RAW_THUMB_START;
-			jpg_reg_ctx->jpg_thumb_data_addr = (UINT32)jpg_data_base_addr + SHARED_JPG_THUMB_START;
+			jpg_reg_ctx->img_thumb_data_addr = (UINT32)jpg_data_base_addr
+								+ JPG_STREAM_BUF_SIZE
+								+ JPG_STREAM_THUMB_BUF_SIZE
+								+ JPG_FRAME_BUF_SIZE;
+			jpg_reg_ctx->jpg_thumb_data_addr = (UINT32)jpg_data_base_addr
+								+ JPG_STREAM_BUF_SIZE;
+
 			result = encode_jpg(jpg_reg_ctx, param.thumb_enc_param);
 		}
 		out = copy_to_user((void *)arg, (void *) & param,  sizeof(jpg_args));
 		break;
 
 	case IOCTL_JPG_GET_STRBUF:
-		jpg_dbg("\nIOCTL_JPG_GET_STRBUF\n");
-		printk("\nIOCTL_JPG_GET_STRBUF\n");
+		jpg_dbg("IOCTL_JPG_GET_STRBUF\n");
 		unlock_jpg_mutex();
-		if(j_mod == JPG_MOD_ENCODE){
-			printk("\nmapped addres %x offset:%x\n",arg,SHARED_JPG_MAIN_START);
-			return arg + SHARED_JPG_MAIN_START;
-		}
-		else{
-			printk("\nmapped addres %x offset:%x\n",arg,JPG_MAIN_START);
-			return arg + JPG_MAIN_START;
-		}
+		return arg + JPG_MAIN_STRART;
+
 	case IOCTL_JPG_GET_THUMB_STRBUF:
-		log_msg(LOG_TRACE, "s3c_jpeg_ioctl", "IOCTL_JPG_GET_THUMB_STRBUF\n");
-		printk("\nIOCTL_JPG_GET_THUMB_STRBUF\n");
+		jpg_dbg("IOCTL_JPG_GET_THUMB_STRBUF\n");
 		unlock_jpg_mutex();
-		if(j_mod == JPG_MOD_ENCODE){
-			printk("\nmapped addres %x offset:%x\n",arg, SHARED_JPG_THUMB_START);
-			return arg + SHARED_JPG_THUMB_START;
-		}
-		else{
-			printk("\nmapped addres %x offset:%x\n",arg,JPG_THUMB_START);
-			return arg + JPG_THUMB_START;
-		}
+		return arg + JPG_THUMB_START;
+
 	case IOCTL_JPG_GET_FRMBUF:
-		jpg_dbg("\nIOCTL_JPG_GET_FRMBUF\n");
-		printk("\nIOCTL_JPG_GET_FRMBUF\n");
-		printk("\nmapped addres %x offset:%x\n",arg,IMG_MAIN_START);
+		jpg_dbg("IOCTL_JPG_GET_FRMBUF\n");
 		unlock_jpg_mutex();
 		return arg + IMG_MAIN_START;
 
 	case IOCTL_JPG_GET_THUMB_FRMBUF:
-		jpg_dbg("\nIOCTL_JPG_GET_THUMB_FRMBUF\n");
-		printk("\nIOCTL_JPG_GET_THUMB_FRMBUF\n");
+		jpg_dbg("IOCTL_JPG_GET_THUMB_FRMBUF\n");
 		unlock_jpg_mutex();
-		if(j_mod == JPG_MOD_ENCODE){
-			printk("\nmapped addres %x offset:%x\n",arg,SHARED_RAW_THUMB_START);
-			return arg + SHARED_RAW_THUMB_START;
-		}
-		else{
-			printk("\nmapped addres %x offset:%x\n",arg,IMG_THUMB_START);
-			return arg + IMG_THUMB_START;
-		}
+		return arg + IMG_THUMB_START;
+
 	case IOCTL_JPG_GET_PHY_FRMBUF:
 		jpg_dbg("IOCTL_JPG_GET_PHY_FRMBUF\n");
 		unlock_jpg_mutex();
@@ -369,17 +298,6 @@ static int s3c_jpeg_ioctl(struct inode *inode, struct file *file, unsigned int c
 		return jpg_data_base_addr + JPG_STREAM_BUF_SIZE
 			+ JPG_STREAM_THUMB_BUF_SIZE + JPG_FRAME_BUF_SIZE;
 
-	case IOCTL_JPG_SET_FRMBUF://Added by padma
-		jpg_dbg("IOCTL_JPG_SET_FRMBUF\n");
-		printk("\nIOCTL_JPG_SET_FRMBUF\n");
-		frmbuf_addr = arg;
-		break;
-	case IOCTL_GET_VADDR:
-		get_vaddr = arg;
-		break;
-	case IOCTL_SET_JPGMODE:
-		j_mod = arg;
-		break;
 	default :
 		jpg_dbg("JPG Invalid ioctl : 0x%X\n", cmd);
 	}
@@ -403,61 +321,29 @@ int s3c_jpeg_mmap(struct file *filp, struct vm_area_struct *vma)
 	unsigned long size	= vma->vm_end - vma->vm_start;
 	unsigned long max_size;
 	unsigned long page_frame_no;
-	if(get_vaddr == 0 && j_mod == JPG_MOD_DECODE){
-		page_frame_no = __phys_to_pfn(jpg_data_base_addr);
 
-		max_size = JPG_TOTAL_BUF_SIZE + PAGE_SIZE - (JPG_TOTAL_BUF_SIZE % PAGE_SIZE);
-		printk("\nJPG_TOTAL_BUF_SIZE %ld\n",JPG_TOTAL_BUF_SIZE);
-		printk("\ns3c_jpeg_mmap mapped size:%ld ,max_size:%ld\n",size,max_size);
-		printk("\nvirtual memory start address:%x end address:%x\n",vma->vm_start,vma->vm_end);
-		if (size > max_size) {
-			printk("requested size is invalid\n");
-			return -EINVAL;
-		}	
-		vma->vm_flags |= VM_RESERVED | VM_IO;
-		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-		if (remap_pfn_range(vma, vma->vm_start, page_frame_no, size,	\
-			    vma->vm_page_prot)) {
-			jpg_err("jpeg remap error");
-			return -EAGAIN;
-		}
+	page_frame_no = __phys_to_pfn(jpg_data_base_addr);
+
+	max_size = JPG_TOTAL_BUF_SIZE + PAGE_SIZE - (JPG_TOTAL_BUF_SIZE % PAGE_SIZE);
+
+	if (size > max_size) {
+		return -EINVAL;
 	}
-	else if(get_vaddr == 0 && j_mod == JPG_MOD_ENCODE){
-		page_frame_no = __phys_to_pfn(jpg_data_base_addr);
-		max_size = SHARED_JPG_TOTAL_BUF_SIZE + PAGE_SIZE - (SHARED_JPG_TOTAL_BUF_SIZE % PAGE_SIZE);
 
-		printk("\nSHARED_JPG_TOTAL_BUF_SIZE %ld\n",SHARED_JPG_TOTAL_BUF_SIZE);
-                printk("\ns3c_jpeg_mmap mapped size:%ld ,max_size:%ld\n",size,max_size);
-                printk("\nvirtual memory start address:%x end address:%x\n",vma->vm_start,vma->vm_end);
-		if (size > max_size) {
-                        printk("requested size is invalid\n");
-                        return -EINVAL;
-                }
-		vma->vm_flags |= VM_RESERVED | VM_IO;
-                vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-		if (remap_pfn_range(vma, vma->vm_start, page_frame_no, size,    \
-                            vma->vm_page_prot)) {
-                        jpg_err("jpeg remap error");
-                        return -EAGAIN;
-                }
-	}	
-	else{
-		get_vaddr = 0;
-		page_frame_no = __phys_to_pfn(frmbuf_addr);
-		vma->vm_flags |= VM_RESERVED | VM_IO;
-	        vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-		if (remap_pfn_range(vma, vma->vm_start, page_frame_no, size,    \
-                            vma->vm_page_prot)) {
-                jpg_err("jpeg remap error");
-                return -EAGAIN;
-       		 }
+	vma->vm_flags |= VM_RESERVED | VM_IO;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	if (remap_pfn_range(vma, vma->vm_start, page_frame_no, size,	\
+			    vma->vm_page_prot)) {
+		jpg_err("jpeg remap error");
+		return -EAGAIN;
 	}
 
 	return 0;
 }
 
 
-static struct file_operations jpeg_fops = {
+static const struct file_operations jpeg_fops = {
 	owner:		THIS_MODULE,
 	open:		s3c_jpeg_open,
 	release:	s3c_jpeg_release,
@@ -482,26 +368,16 @@ static int s3c_jpeg_probe(struct platform_device *pdev)
 	static int		size;
 	static int		ret;
 	HANDLE 			h_mutex;
-#ifdef CONFIG_CPU_S5PC100
-	// JPEG clock enable
-	jpeg_hclk = clk_get(NULL, "hclk_jpeg");
 
-	if (!jpeg_hclk) {
-		printk(KERN_ERR "failed to get jpeg hclk source\n");
+	s3c_jpeg_clk = clk_get(&pdev->dev, "jpeg");
+
+	if (IS_ERR(s3c_jpeg_clk)) {
+		jpg_err("failed to find jpeg clock source\n");
 		return -ENOENT;
 	}
 
-	clk_enable(jpeg_hclk);
+	clk_enable(s3c_jpeg_clk);
 
-	jpeg_sclk = clk_get(NULL, "sclk_jpeg");
-
-	if (!jpeg_sclk) {
-		printk(KERN_ERR "failed to get jpeg scllk source\n");
-		return -ENOENT;
-	}
-
-	clk_enable(jpeg_sclk);
-#endif
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 
 	if (res == NULL) {
@@ -521,35 +397,23 @@ static int s3c_jpeg_probe(struct platform_device *pdev)
 
 	if (res == NULL) {
 		jpg_err("failed to get irq resource\n");
-		ret = -ENOENT;
-		goto err_res;
+		return -ENOENT;
 	}
 
 	irq_no = res->start;
-	ret = request_irq(res->start, (void*)s3c_jpeg_irq, 0, pdev->name, pdev);
+	ret = request_irq(res->start, (void *)s3c_jpeg_irq, 0, pdev->name, pdev);
 
 	if (ret != 0) {
 		jpg_err("failed to install irq (%d)\n", ret);
-		goto err_res;
+		return ret;
 	}
 
 	s3c_jpeg_base = ioremap(s3c_jpeg_mem->start, size);
 
 	if (s3c_jpeg_base == 0) {
 		jpg_err("failed to ioremap() region\n");
-		ret = -EINVAL;
-		goto err_irq;
+		return -EINVAL;
 	}
-
-	s3c_jpeg_clk = clk_get(&pdev->dev, "jpeg");
-
-        if (s3c_jpeg_clk == NULL) {
-                printk(KERN_INFO "failed to find jpeg clock source\n");
-                ret = -ENOENT;
-                goto err_map;
-        }
-
-        clk_enable(s3c_jpeg_clk);
 
 	init_waitqueue_head(&wait_queue_jpeg);
 
@@ -560,16 +424,14 @@ static int s3c_jpeg_probe(struct platform_device *pdev)
 
 	if (h_mutex == NULL) {
 		jpg_err("JPG Mutex Initialize error\r\n");
-		ret = -ENOMEM;
-		goto err_clk;
+		return FALSE;
 	}
 
 	ret = lock_jpg_mutex();
 
 	if (!ret) {
 		jpg_err("JPG Mutex Lock Fail\n");
-		ret = -EBUSY;
-		goto err_clk;
+		return FALSE;
 	}
 
 	instanceNo = 0;
@@ -577,28 +439,11 @@ static int s3c_jpeg_probe(struct platform_device *pdev)
 	unlock_jpg_mutex();
 
 	ret = misc_register(&s3c_jpeg_miscdev);
-	if(ret){
-		jpg_err("Unable to register the s3c-jpeg driver\n");
-		goto err_clk;
-	}
-#ifdef CONFIG_CPU_S5PC100
-	clk_disable(jpeg_hclk);
-	clk_disable(jpeg_sclk);
-#endif
-	return 0;
 
-err_clk:
+	/* clock disable */
 	clk_disable(s3c_jpeg_clk);
-	clk_put(s3c_jpeg_clk);
-err_map:
-	iounmap(s3c_jpeg_base);
-err_irq:
-	free_irq(irq_no,pdev);
-err_res:
-	release_resource(s3c_jpeg_mem);
-	kfree(s3c_jpeg_mem);
-	
-	return ret;
+
+	return 0;
 }
 
 static int s3c_jpeg_remove(struct platform_device *dev)
@@ -608,25 +453,40 @@ static int s3c_jpeg_remove(struct platform_device *dev)
 		kfree(s3c_jpeg_mem);
 		s3c_jpeg_mem = NULL;
 	}
-	clk_disable(s3c_jpeg_clk);
-	clk_put(s3c_jpeg_clk);
+
 	free_irq(irq_no, dev);
 	misc_deregister(&s3c_jpeg_miscdev);
 	return 0;
 }
 
-#ifdef CONFIG_CPU_S5PC110
+#ifdef CONFIG_CPU_S5PV210
 static int s3c_jpeg_suspend(struct platform_device *pdev, pm_message_t state)
 {
+	int ret;
 	/* clock disable */
 	clk_disable(s3c_jpeg_clk);
+	
+	ret = s5pv210_pd_disable("jpeg_pd");
+	if (ret < 0) {
+		jpg_err("failed to disable jpeg power domain\n");
+		return FALSE;
+	}
 	return 0;
 }
 
 static int s3c_jpeg_resume(struct platform_device *pdev)
 {
+	int ret;
+	
+	ret = s5pv210_pd_enable("jpeg_pd");
+	if (ret < 0) {
+		jpg_err("failed to enable jpeg power domain\n");
+		return FALSE;
+	}
+	
 	/* clock enable */
 	clk_enable(s3c_jpeg_clk);
+
 	return 0;
 }
 #endif
@@ -635,13 +495,8 @@ static struct platform_driver s3c_jpeg_driver = {
 	.probe		= s3c_jpeg_probe,
 	.remove		= s3c_jpeg_remove,
 	.shutdown	= NULL,
-#ifdef CONFIG_CPU_S5PC100
-	.suspend	= NULL,
-	.resume		= NULL,
-#else //CONFIG_CPU_S5PC110
 	.suspend	= s3c_jpeg_suspend,
 	.resume		= s3c_jpeg_resume,
-#endif
 	.driver		= {
 			.owner	= THIS_MODULE,
 			.name	= "s3c-jpg",
@@ -653,11 +508,7 @@ static char banner[] __initdata = KERN_INFO "S3C JPEG Driver, (c) 2007 Samsung E
 static int __init s3c_jpeg_init(void)
 {
 	printk(banner);
-#ifdef CONFIG_CPU_S5PC100
-	printk("JPEG driver for S5PC100 \n");
-#else //CONFIG_CPU_S5PC110
-	printk("JPEG driver for S5PC110 \n");
-#endif
+	printk("JPEG driver for S5PV210 \n");
 	return platform_driver_register(&s3c_jpeg_driver);
 }
 

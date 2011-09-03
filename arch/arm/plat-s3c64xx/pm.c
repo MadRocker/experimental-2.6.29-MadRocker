@@ -785,10 +785,6 @@ void (*pm_cpu_sleep)(void);
 */
 
 extern unsigned int extra_eint0pend = 0x0;
-extern unsigned int extra_wakeup_stat = 0x0;
-
-EXPORT_SYMBOL(extra_eint0pend);
-EXPORT_SYMBOL(extra_wakeup_stat);
 
 static int s3c6410_pm_enter(suspend_state_t state)
 {

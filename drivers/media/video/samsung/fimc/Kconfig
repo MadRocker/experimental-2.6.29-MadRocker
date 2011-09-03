@@ -1,9 +1,18 @@
 config VIDEO_FIMC
 	bool "Samsung Camera Interface (FIMC) driver"
-	depends on VIDEO_SAMSUNG && (CPU_S5PC100 || CPU_S5PC110)
+	depends on VIDEO_SAMSUNG && ARCH_S5PV210
+	select VIDEO_IPC if ARCH_S5PV210
 	default n
-	---help---
+	help
 	  This is a video4linux driver for Samsung FIMC device.
+
+config  VIDEO_FIMC_ATLAS
+        bool "Select Samsung Camera Interface (FIMC) driver for atlas"
+        depends on VIDEO_FIMC
+config VIDEO_FIMC_VICTORY
+        bool "Select Samsung Camera Interface (FIMC) driver for victory"
+        depends on VIDEO_FIMC
+
 
 choice
 depends on VIDEO_FIMC
@@ -11,16 +20,19 @@ prompt "Select CSC Range config"
 default VIDEO_FIMC_RANGE_NARROW
 config VIDEO_FIMC_RANGE_NARROW
 	bool "Narrow"
-	depends on VIDEO_FIMC && (CPU_S5PC100 || CPU_S5PC110)
+	depends on VIDEO_FIMC && ARCH_S5PV210
 	---help---
 	  RGB <-> YUV Color Conversion Narrow Range Equation
 
 config VIDEO_FIMC_RANGE_WIDE
 	bool "Wide"
-	depends on VIDEO_FIMC && (CPU_S5PC100 || CPU_S5PC110)
+	depends on VIDEO_FIMC && ARCH_S5PV210
 	---help---
 	  RGB <-> YUV Color Conversion Wide Range Equation
 endchoice	
+
+config VIDEO_IPC
+	bool
 
 config VIDEO_FIMC_DEBUG
 	bool "FIMC driver debug messages"
@@ -28,8 +40,23 @@ config VIDEO_FIMC_DEBUG
 
 config VIDEO_FIMC_MIPI
 	bool "MIPI-CSI2 Slave Interface support"
-	depends on VIDEO_FIMC && (CPU_S5PC100 || CPU_S5PC110)
+	depends on VIDEO_FIMC && ARCH_S5PV210
+	default y
 
-config VIDEO_IPC
-	bool "IPC support"
-	depends on VIDEO_FIMC && CPU_S5PC110
+choice
+depends on VIDEO_FIMC
+prompt "Select Output Mode"
+default VIDEO_FIMC_DMA_AUTO
+config VIDEO_FIMC_DMA_AUTO
+        bool "DMA AUTO MODE"
+        depends on VIDEO_FIMC
+        help
+          This enables support for FIMC1 DMA AUTO mode
+
+config VIDEO_FIMC_FIFO
+        bool "FIFO MODE"
+        depends on VIDEO_FIMC
+        help
+          This enables support for FIMC1 FIFO mode
+
+endchoice

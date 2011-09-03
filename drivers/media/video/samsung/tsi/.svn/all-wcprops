@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/tsi
+END
+Kconfig
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/tsi/Kconfig
+END
+s3c-tsi.c
+K 25
+svn:wc:ra_dav:version-url
+V 91
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/tsi/s3c-tsi.c
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/tsi/Makefile
+END

@@ -38,6 +38,10 @@ static int gpio_led_early_suspend(struct early_suspend *handler);
 static int gpio_led_early_resume(struct early_suspend *handler);
 //#endif	/* CONFIG_HAS_EARLYSUSPEND */
 #endif
+#if 0//defined (CONFIG_MACH_VINSQ)
+static u8 first_probe = 1;
+static u8 first_setting = 1;
+#endif
 
 static void gpio_led_work(struct work_struct *work)
 {
@@ -57,7 +61,7 @@ static void gpio_led_set(struct led_classdev *led_cdev, enum led_brightness valu
 	else
 		level = (value == LED_OFF)?0:1;	
 #else
-level = 0;
+	level = 0;
 #endif
 
 	/* Setting GPIOs with I2C/etc requires a task context, and we don't
@@ -68,8 +72,20 @@ level = 0;
 		led_dat->new_level = level;
 		schedule_work(&led_dat->work);
 	} else {
+#if 0//defined (CONFIG_MACH_VINSQ)
+		if(led_dat->gpio == GPIO_MAIN_KEY_LED_EN)
+		{
+			if(first_setting)
+			{
+				printk("[LEDS-%s] %s (%d, %d)\n", __func__, led_dat->cdev.name, led_dat->gpio, level);
+				gpio_set_value(led_dat->gpio, 0);
+				first_setting = 0;
+				return;
+			}
+		}
+#endif
 		gpio_set_value(led_dat->gpio, level);
-		printk("[*****] gpio_led_set: gpio_set_value(%d, %d)\n", led_dat->gpio, level);
+		printk("[LEDS-%s] gpio_set_value(%d, %d)\n", __func__,led_dat->gpio, level);
 	}
 }
 
@@ -115,9 +131,16 @@ static int gpio_led_probe(struct platform_device *pdev)
 		led_dat->cdev.brightness_set = gpio_led_set;
 		led_dat->cdev.brightness = LED_OFF;
 
-#if 1  // Android Platform
-		gpio_direction_output(led_dat->gpio, led_dat->active_low);
+#if 0//defined (CONFIG_MACH_VINSQ)
+		if(led_dat->gpio == GPIO_MAIN_KEY_LED_EN && first_probe)
+		{
+			printk("[LEDS-%s] %s (%d)\n", __func__, led_dat->cdev.name, led_dat->gpio);
+			first_probe = 0;
+		}
+		else
 #endif
+		gpio_direction_output(led_dat->gpio, led_dat->active_low);
+
 		INIT_WORK(&led_dat->work, gpio_led_work);
 
 		ret = led_classdev_register(&pdev->dev, &led_dat->cdev);

@@ -1,0 +1,1 @@
+cmd_arch/arm/mach-s3c6410/built-in.o :=  /home/madrocker/Desktop/JetDroid1/toolchain/arm-eabi-4.4.3/bin/arm-eabi-ld -EL    -r -o arch/arm/mach-s3c6410/built-in.o arch/arm/mach-s3c6410/cpu.o arch/arm/mach-s3c6410/irq.o arch/arm/mach-s3c6410/setup-sdhci.o arch/arm/mach-s3c6410/pm.o arch/arm/mach-s3c6410/mach-jet.o arch/arm/mach-s3c6410/board-rfkill.o 

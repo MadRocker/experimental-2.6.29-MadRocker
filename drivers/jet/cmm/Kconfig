@@ -5,7 +5,7 @@
 ##menu "S3C_CMM Support"
 
 config S3C_CMM
-    bool "Codec Memory Manager"
+    bool "Samsung Codec Memory Manager"
     depends on CPU_S3C6410
     default y
 	help

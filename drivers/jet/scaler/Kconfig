@@ -1,0 +1,13 @@
+#
+# Makefile for JPEG CODEC device driver designed by Samsung Electronics 2007
+# Woosung Chung <woosung2.jung@samsung.com>
+#
+
+config VIDEO_SCALER
+	bool 	  "SAMSUNG SCALER device support"
+	depends on CPU_S3C6410
+        default y
+	help
+	    SCALER
+
+

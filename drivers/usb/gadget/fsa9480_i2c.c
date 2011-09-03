@@ -1,803 +1,335 @@
-/* linux/drivers/usb/gadget/fsa9480_i2c.c 
- *
- * Driver for FSA9480 USB switching IC
- *
- * dopi711@googlemail.com, Copyright (c) 2010 JetDroid project
- *      http://code.google.com/p/jetdroid
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- */
-
-#include <linux/interrupt.h>
-#include <linux/irq.h>
-
-#include <plat/pm.h>
-#include <plat/s3c64xx-dvfs.h>
-#include <linux/i2c/pmic.h>
-  
-#include <mach/param.h>
-#include <linux/random.h>
-#include "fsa9480_i2c.h"
-
-#include <linux/wakelock.h>
-
-static struct wake_lock fsa9480_wake_lock;
-
-extern int is_pmic_initialized(void);
+/*
+* ==============================================================================
+*  Name          : fsa9480_i2c.h
+*  Part of         : MicroUsbDetector Driver
+*  Description :  Definitions of FSA9480
+*  Version       : 0
+*  Author         : wonsuk jung (grant.jung@samsung.com)
+*
+* ==============================================================================
+*/
 
 
-extern struct device *switch_dev;
-extern ftm_sleep;
+/* enalbing debug massage related with FSA9480*/
+#define FSA9480_DBG_ENABLE
 
-#define FSA9480_UART 	1
-#define FSA9480_USB 	2
-
-#define FSA9480UCX		0x4A
-static unsigned short fsa9480_normal_i2c[] = {I2C_CLIENT_END };
-static unsigned short fsa9480_ignore[] = { I2C_CLIENT_END };
-
-#ifdef CONFIG_JET_OPTION
-static unsigned short fsa9480_i2c_probe[] = { 4, FSA9480UCX >> 1, I2C_CLIENT_END };
+#ifdef  FSA9480_DBG_ENABLE
+#define DEBUG_FSA9480(fmt,args...) printk(fmt, ##args)
 #else
-static unsigned short fsa9480_i2c_probe[] = { 5, FSA9480UCX >> 1, I2C_CLIENT_END };
+#define DEBUG_FSA9480(fmt,args...) do {} while(0)
 #endif
-
-static struct i2c_client fsa9480_i2c_client;
-static struct i2c_driver fsa9480_i2c_driver;
-
-static int usb_path = 0;
-static int usb_power = 2;
-static int usb_state = 0;
-
-static struct timer_list fsa9480_init_timer;
-static wait_queue_head_t usb_detect_waitq;
-static struct workqueue_struct *fsa9480_workqueue;
-static struct work_struct fsa9480_work;
-
-static struct i2c_client_address_data fsa9480_addr_data = {
-	.normal_i2c = fsa9480_normal_i2c,
-	.ignore     = fsa9480_ignore,
-	.probe      = fsa9480_i2c_probe,
-};
 
 
 /********************************************************************/
-/* function definitions                                                                             */
+/* FSA9480 Register definition                                                                                */
 /********************************************************************/
+/* DEVICE ID Register*/
+#define REGISTER_DEVICEID               0x01     
+/* CONTROL Register*/
+#define REGISTER_CONTROL                0x02   
+#define REGISTER_INTERRUPT1             0x03  
+#define REGISTER_INTERRUPT2             0x04   
+#define REGISTER_INTERRUPTMASK1         0x05
+#define REGISTER_INTERRUPTMASK2         0x06
+#define REGISTER_ADC                0x07
+#define REGISTER_TIMINGSET1             0x08
+#define REGISTER_TIMINGSET2         0x09
+#define REGISTER_DEVICETYPE1            0x0A
+#define REGISTER_DEVICETYPE2        0x0B
+#define REGISTER_BUTTON1                0x0C
+#define REGISTER_BUTTON2                0x0D
+#define REGISTER_CARKITSTATUS       0x0E
+#define REGISTER_CARKITINT1         0x0F
+#define REGISTER_CARKITINT2         0x10
+#define REGISTER_CARKITMASK1        0x11
+#define REGISTER_CARKITMASK2        0x12
+/* Manual SW1 Register*/
+#define REGISTER_MANUALSW1              0x13                       
+/* Manual SW2 Register */
+#define REGISTER_MANUALSW2              0x14                   
+/* Hidden Register*/
+#define HIDDEN_REGISTER_MANUAL_OVERRDES1        0x1B     
 
-//by ss1
-//refer to drivers/usb/gadget/s3c-udc-otg-hs.c	
-void s3c_udc_power_up(void);
-void s3c_udc_power_down(void);
-void fsa9480_SetAutoSWMode(void);
+/*define IRQ INTB*/
+#define IRQ_FSA9480_INTB        IRQ_EINT(23)
 
 
-int wait_condition = 0;
-static bool ta_connection = false;
+//CR2 : Control Register
+#define         INT_MASK                                (0x1 << 0)
+#define         SW_WAIT                                 (0x1 << 1)
+#define         MANUAL_SW                               (0x1 << 2)
+#define         RAW_DATA                                (0x1 << 3)
+#define         SW_OPEN                                 (0x1 << 4)
+
+//CR3 : Interrupt 1 Register
+#define         KEY_PRESS                               (0x1 << 2)
+#define         LONG_KEY_PRESS                  (0x1 << 3)
+#define         LONG_KEY_RELEASE                (0x1 << 4)
+#define         OVP_EN                                  (0x1 << 5)
+#define         OCP_EN                                  (0x1 << 6)
+#define         OVP_OCP_DIS                             (0x1 << 7)
+
+//CR5 : Interrupt 1 Mask Register
+#define         ATTACH_INT_MASK                         (0x1 <<0)
+#define         DETACH_INT_MASK                         (0x1 <<1)
+#define         KEY_PRESS_INT_MASK                      (0x1 <<2)
+#define         LONGKEY_PRESS_INT_MASK          (0x1 <<3)
+#define         LONGKEY_RELEASE_INT_MASK        (0x1 <<4)
+#define         OVP_INT_MASK                            (0x1 <<5)
+#define         OCP_INT_MASK                            (0x1 <<6)
+#define         OVP_OCP_DIS_INT_MASK            (0x1 <<7)
+
+//CR7 : ADC Register
+#define         USB_OTG                                         0x00
+#define         SEND_END                                        0x01
+#define         AUDIO_REMOTE_S1_BUTTON          0x02
+#define         AUDIO_REMOTE_S2_BUTTON          0x03
+#define         AUDIO_REMOTE_S3_BUTTON          0x04
+#define         AUDIO_REMOTE_S4_BUTTON          0x05
+#define         AUDIO_REMOTE_S5_BUTTON          0x06
+#define         AUDIO_REMOTE_S6_BUTTON          0x07
+#define         AUDIO_REMOTE_S7_BUTTON          0x08
+#define         AUDIO_REMOTE_S8_BUTTON          0x09
+#define         AUDIO_REMOTE_S9_BUTTON          0x0A
+#define         AUDIO_REMOTE_S10_BUTTON         0x0B
+#define         AUDIO_REMOTE_S11_BUTTON         0x0C
+#define         AUDIO_REMOTE_S12_BUTTON         0x0D
+#define         RESERVED_ACCESSORY_1            0x0E
+#define         RESERVED_ACCESSORY_2            0x0F
+#define         RESERVED_ACCESSORY_3            0x10
+#define         RESERVED_ACCESSORY_4            0x11
+#define         RESERVED_ACCESSORY_5            0x12
+#define         AUDIO_DEICE_TYPE_2                      0x13
+#define         PHONE_POWERED_DEVICE            0X14
+#define         TTY_CONVERTER                           0x15
+#define         UART_CABLE                                      0x16
+#define         CEA936A_TYPE_1_CHARGER          0x17
+#define         FACTORY_MODE_BOOT_OFF_USB       0x18
+#define         FACTORY_MODE_BOOT_ON_USB        0x19
+#define         AUDIO_VEDIO_CABLE                       0x1A
+#define         CEA936A_TYPE_2_CHARGER          0x1B
+#define         FACTORY_MODE_BOOT_OFF_UART      0x1C
+#define         FACTORY_MODE_BOOT_ON_UART       0x1D
+#define         AUDIO_DEVICE_TYPE_1                     0x1E
+#define         USB_OR_ACCESSORY_DETACH         0x1F
+
+//CR8 : Timing Set 1 Register
+#define         DEVICE_WAKE_UP_TIME_MASK        0x0F
+#define         KEY_PRESS_TIME_MASK                     0xF0
+
+#define         KEY_PRESS_TIME_300MS            0x20
+#define         KEY_PRESS_TIME_700MS            0x60
+#define         KEY_PRESS_TIME_1S                       0x90
+
+//CR9 : Timing Set 2 Register
+#define         LONGKEY_PRESS_TIME_MASK         0x0F
+#define         SWITCHING_TIME_MASK                     0xF0
+
+#define         LONGKEY_PRESS_TIME_1S           0x07
+#define         LONGKEY_PRESS_TIME_1_5S         0x0C
+
+//CRA : Device Type 1 Register
+#define         CRA_AUDIO_TYPE1             (0x1 <<0)
+#define         CRA_AUDIO_TYPE2             (0x1 <<1)
+#define         CRA_USB                     (0x1 <<2)
+#define         CRA_UART                    (0x1 <<3)
+#define         CRA_CARKIT                  (0x1 <<4)
+#define         CRA_USB_CHARGER             (0x1 <<5)
+#define         CRA_DEDICATED_CHG           (0x1 <<6)
+#define         CRA_USB_OTG                 (0x1 <<7)
+
+//CRB : Device Type 2 Register
+#define         CRB_JIG_USB_ON              (0x1 <<0)
+#define         CRB_JIG_USB_OFF             (0x1 <<1)
+#define         CRB_JIG_UART_ON             (0x1 <<2)
+#define         CRB_JIG_UART_OFF            (0x1 <<3)
+#define         CRB_PPD                     (0x1 <<4)
+#define         CRB_TTY                     (0x1 <<5)
+#define         CRB_AV                      (0x1 <<6)
+//Factory mode cable detected
+#define     CRB_JIG_USB                 (0x3 <<0)
+#define     CRB_JIG_UART                (0x3 <<2)
+
+//Device1, 2 Register's Device Not Connected value
+#define     DEVICE_TYPE_NC              0x00
+
+//CRC : Button 1 Register
+#define         BUTTON_SEND_END                         (0x1 <<0)
+#define         BUTTON_1                                        (0x1 <<1)
+#define         BUTTON_2                                        (0x1 <<2)
+#define         BUTTON_3                                        (0x1 <<3)
+#define         BUTTON_4                                        (0x1 <<4)
+#define         BUTTON_5                                        (0x1 <<5)
+#define         BUTTON_6                                        (0x1 <<6)
+#define         BUTTON_7                                        (0x1 <<7)
+
+//CRD : Button 2 Register
+#define         BUTTON_8                                        (0x1 <<0)
+#define         BUTTON_9                                        (0x1 <<1)
+#define         BUTTON_10                                       (0x1 <<2)
+#define         BUTTON_11                                       (0x1 <<3)
+#define         BUTTON_12                                       (0x1 <<4)
+#define         BUTTON_ERROR                            (0x1 <<5)
+#define         BUTTON_UNKNOW                           (0x1 <<6)
+
+#define USBSTATUS_UMS                                   0x0
+#define USBSTATUS_SAMSUNG_KIES          0x1
+#define USBSTATUS_MTPONLY                               0x2
+#define USBSTATUS_ASKON                                 0x4
+#define USBSTATUS_VTP                                   0x8
+#define USBSTATUS_ADB                                   0x10
+#define USBSTATUS_DM                                    0x20
+#define USBSTATUS_ACM                                   0x30
+#define USBSTATUS_SAMSUNG_KIES_REAL     0x80
 
 
 
-void get_usb_serial(char *usb_serial_number)
+typedef enum
 {
-	char temp_serial_number[13] = {0};
+        RID_USB_OTG_MODE,                       /* 0 0 0 0 0    GND             USB OTG Mode              */
+        RID_AUD_SEND_END_BTN,           /* 0 0 0 0 1    2K              Audio Send_End Button*/
+        RID_AUD_REMOTE_S1_BTN,          /* 0 0 0 1 0    2.604K          Audio Remote S1 Button */
+        RID_AUD_REMOTE_S2_BTN,          /* 0 0 0 1 1    3.208K          Audio Remote S2 Button                         */
+        RID_AUD_REMOTE_S3_BTN,          /* 0 0 1 0 0    4.014K          Audio Remote S3 Button */
+        RID_AUD_REMOTE_S4_BTN,          /* 0 0 1 0 1    4.82K           Audio Remote S4 Button */
+        RID_AUD_REMOTE_S5_BTN,          /* 0 0 1 1 0    6.03K           Audio Remote S5 Button */
+        RID_AUD_REMOTE_S6_BTN,          /* 0 0 1 1 1    8.03K           Audio Remote S6 Button */
+        RID_AUD_REMOTE_S7_BTN,          /* 0 1 0 0 0    10.03K          Audio Remote S7 Button */
+        RID_AUD_REMOTE_S8_BTN,          /* 0 1 0 0 1    12.03K          Audio Remote S8 Button */
+        RID_AUD_REMOTE_S9_BTN,          /* 0 1 0 1 0    14.46K          Audio Remote S9 Button */
+        RID_AUD_REMOTE_S10_BTN,         /* 0 1 0 1 1    17.26K          Audio Remote S10 Button */
+        RID_AUD_REMOTE_S11_BTN,         /* 0 1 1 0 0    20.5K           Audio Remote S11 Button */
+        RID_AUD_REMOTE_S12_BTN,         /* 0 1 1 0 1    24.07K          Audio Remote S12 Button */
+        RID_RESERVED_1,                         /* 0 1 1 1 0    28.7K           Reserved Accessory #1 */
+        RID_RESERVED_2,                         /* 0 1 1 1 1    34K             Reserved Accessory #2 */
+        RID_RESERVED_3,                         /* 1 0 0 0 0    40.2K           Reserved Accessory #3 */
+        RID_RESERVED_4,                         /* 1 0 0 0 1    49.9K           Reserved Accessory #4 */
+        RID_RESERVED_5,                         /* 1 0 0 1 0    64.9K           Reserved Accessory #5 */
+        RID_AUD_DEV_TY_2,                       /* 1 0 0 1 1    80.07K          Audio Device Type 2 */
+        RID_PHONE_PWD_DEV,                      /* 1 0 1 0 0    102K            Phone Powered Device */
+        RID_TTY_CONVERTER,                      /* 1 0 1 0 1    121K            TTY Converter */
+        RID_UART_CABLE,                         /* 1 0 1 1 0    150K            UART Cable */
+        RID_CEA936A_TY_1,                       /* 1 0 1 1 1    200K            CEA936A Type-1 Charger(1) */
+        RID_FM_BOOT_OFF_USB,            /* 1 1 0 0 0    255K            Factory Mode Boot OFF-USB */
+        RID_FM_BOOT_ON_USB,                     /* 1 1 0 0 1    301K            Factory Mode Boot ON-USB */
+        RID_AUD_VDO_CABLE,                      /* 1 1 0 1 0    365K            Audio/Video Cable */
+        RID_CEA936A_TY_2,                       /* 1 1 0 1 1    442K            CEA936A Type-2 Charger(1) */
+        RID_FM_BOOT_OFF_UART,           /* 1 1 1 0 0    523K            Factory Mode Boot OFF-UART */
+        RID_FM_BOOT_ON_UART,            /* 1 1 1 0 1    619K            Factory Mode Boot ON-UART */
+        RID_AUD_DEV_TY_1_REMOTE,        /* 1 1 1 1 0    1000.07K        Audio Device Type 1 with Remote(1) */
+        RID_AUD_DEV_TY_1_SEND = RID_AUD_DEV_TY_1_REMOTE ,               /* 1 1 1 1 0    1002K           Audio Device Type 1 / Only Send-End(2) */
+        RID_USB_MODE,                           /* 1 1 1 1 1    Open            USB Mode, Dedicated Charger or Accessory Detach */
+        RID_MAX
 
-	u32 serial_number=0;
-	
-	serial_number = (system_serial_high << 16) + (system_serial_low >> 16);
+}FSA9480_RID_ENUM_TYPE;
 
-#if defined(CONFIG_MACH_VINSQ)
-        sprintf(temp_serial_number,"M910%08x",serial_number);
-#elif defined(CONFIG_MACH_QUATTRO)
-  sprintf(temp_serial_number,"M9X0%08x",serial_number); //not defined
-#elif defined(CONFIG_MACH_INSTINCTQ)
-#ifdef CONFIG_JET_OPTION
-	sprintf(temp_serial_number,"Jet8%08x",serial_number);
-#else
-	sprintf(temp_serial_number,"M900%08x",serial_number);
-#endif /* CONFIG_JET_OPTION */
+typedef enum
+{
+        FSA9480_REG_DEVICE_ID =0x01,
+        FSA9480_REG_CONTROL=0x02,
+        FSA9480_REG_INT_1=0x03,
+        FSA9480_REG_INT_2=0x04,
+        FSA9480_REG_IMASK_1=0x05,
+        FSA9480_REG_IMASK_2=0x06,
+        FSA9480_REG_ADC=0x07,
+        FSA9480_REG_TINING_1=0x08,
+        FSA9480_REG_TIMING_2=0x09,
+        FSA9480_REG_DEV_TY_1=0x0A,
+        FSA9480_REG_DEV_TY_2=0x0B,
+        FSA9480_REG_BTN_1=0x0C,
+        FSA9480_REG_BTN_2=0x0D,
+        FSA9480_REG_CAR_KIT=0x0E,
+        FSA9480_REG_CAR_KIT_INT_1=0x0F,
+        FSA9480_REG_CAR_KIT_INT_2=0x10,
+        FSA9480_REG_CAR_KIT_IMASK_1=0x11,
+        FSA9480_REG_CAR_KIT_IMASK_2=0x12,
+        FSA9480_REG_MANUAL_SW_1=0x13,
+        FSA9480_REG_MANUAL_SW_2=0x14
+}FSA9480_REG_ADDR;
+
+typedef enum
+{
+        FSA9480_DEV_TY1_AUD_TY1         = 0x01,
+        FSA9480_DEV_TY1_AUD_TY2         = 0x02,
+        FSA9480_DEV_TY1_USB             = 0x04,
+        FSA9480_DEV_TY1_UART            = 0x08,
+        FSA9480_DEV_TY1_CAR_KIT         = 0x10,
+        FSA9480_DEV_TY1_USB_CHG         = 0x20,
+        FSA9480_DEV_TY1_DED_CHG         = 0x40,
+        FSA9480_DEV_TY1_USB_OTG = 0x80,
+}FSA9480_DEV_TY1_TYPE;
+
+typedef enum
+{
+        FSA9480_DEV_TY2_JIG_USB_ON              = 0x01,
+        FSA9480_DEV_TY2_JIG_USB_OFF     = 0x02,
+        FSA9480_DEV_TY2_JIG_UART_ON     = 0x04,
+        FSA9480_DEV_TY2_JIG_UART_OFF    = 0x08,
+        FSA9480_DEV_TY2_PDD     = 0x10,
+        FSA9480_DEV_TY2_TTY     = 0x20,
+        FSA9480_DEV_TY2_AV      = 0x40,
+}FSA9480_DEV_TY2_TYPE;
+
+typedef enum
+{
+        FSA9480_INT1_ATTACH             =       0x01,
+        FSA9480_INT1_DETACH     =       0x02,
+        FSA9480_INT1_KP                 =       0x04,
+        FSA9480_INT1_LKP                =       0x08,
+        FSA9480_INT1_LKR                =       0x10,
+        FSA9480_INT1_OVP_EN     =       0x20,
+        FSA9480_INT1_OCP_EN     =       0x40,
+        FSA9480_INT1_OVP_OCP_DIS=       0x80
+}FSA9480_INT1_TYPE;
+
+
+#if 1 //20100520_inchul
+typedef enum
+{
+        FSA9480_INT2_RESERVED_ATTACH    =       0x02
+}FSA9480_INT2_TYPE;
 #endif
-	strcpy(usb_serial_number,temp_serial_number);
-}
 
-
-int available_PM_Set(void)
+typedef enum
 {
-    DEBUG_FSA9480("[FSA9480]%s ", __func__);
+        USB_SW_AP,
+        USB_SW_CP
+} USB_SWITCH_MODE;
 
-	if(is_pmic_initialized())
-	{
-#ifdef CONFIG_PMIC_MAX8698
-		printk("[FSA9480] found max8698 \n");
-#else ifdef CONFIG_PMIC_MAX8906
-		printk("[FSA9480] found max8906 \n");
-#endif
-		return 1;
-	}
-	printk("[FSA9480] PMIC is not initialized!!!\n");
-	return 0;
-}
-
-int get_usb_power_state(void)
+typedef enum
 {
-    DEBUG_FSA9480("[FSA9480]%s : usb_power = %d \n ", __func__,usb_power);
-	
+        UART_SW_AP,
+        UART_SW_CP
+} UART_SWITCH_MODE;
 
-	if(usb_power !=1 )
-	{
-		
-		wait_condition = 0;
-		wait_event_interruptible_timeout(usb_detect_waitq, wait_condition , 2 * HZ); 
-	}
-
-	if(usb_power==2 && ta_connection)
-	{
-		printk("[FSA9480] usb_power = 2 & taconnection is true \n");
-		return 0;
-	}
-
-	return usb_power;
-}
-int get_usb_cable_state(void)
+typedef enum
 {
-    //DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	return usb_state;
-}
+        CONNECTIVITY_NV_USB_SW = 0,             // BIT 0
+        CONNECTIVITY_NV_UART_SW = 1,    // BIT 1
+        CONNECTIVITY_NV_ASK_ON = 2,     // BIT 2
+        CONNECTIVITY_NV_DATA = 3,               // BIT 4-7
+        CONNECTIVITY_NV_DIAG = 4,               // BIT 8-11
+        CONNECTIVITY_NV_WINC = 5,               // BIT 12-15
+        CONNECTIVITY_NV_USB = 6,                // BIT 16-19
+        CONNECTIVITY_NV_MAX = 7,                // BIT 16-19
+}DRV_CONNECTIVITY_NV_TYPE;
 
-void fsa9480_s3c_udc_on(void)
-{	
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	usb_power = 1;
 
-	//SEC_BSP_WONSUK_20090806 
-	//resolve Power ON/OFF panic issue. do not wake_up function before FSA9480 probe.
-	if(&usb_detect_waitq == NULL)
-	{
-		printk("[FSA9480] fsa9480_s3c_udc_on : usb_detect_waitq is NULL\n");
-	}
-	else
-	{
-		wait_condition = 1;
-		wake_up_interruptible(&usb_detect_waitq);
-	}
+typedef enum {
+        AP_USB_MODE,
+        AP_UART_MODE,
+        CP_USB_MODE,
+        CP_UART_MODE,
+}Usb_Uart_Sw_Mode_type;
 
-    /*LDO control*/
-#ifdef CONFIG_PMIC_MAX8698
-	if(!Set_MAX8698_PM_REG(ELDO3, 1) || !Set_MAX8698_PM_REG(ELDO8, 1))
-		printk("[FSA9480]%s : Fail to LDO ON\n ", __func__);
-#elif defined(CONFIG_PMIC_MAX8906)
-//	if(!Set_MAX8906_PM_REG(ELDO3, 1) || !Set_MAX8906_PM_REG(ELDO8, 1)) {
-		printk("[FSA9480]%s : Fail to LDO ON\n ", __func__);
-	/* } else { */
-	/* 	printk("[FSA9480]%s : Switched LDO ON\n ", __func__); */
-	/* } */
-#else
-		printk("[FSA9480]%s : Fail to LDO ON\n ", __func__);
+#if 1 //20100630_inchul
+typedef enum
+{
+        SEC_DOCK_NO_DEVICE                                      = 0x0,
+        SEC_DESK_DOCK_DEVICE                    = 0x01 << 0,
+        SEC_CAR_DOCK_DEVICE                     = 0x01 << 1,
+}USB_DOCK_TYPE;
 #endif
 
-}
-
-void fsa9480_s3c_udc_off(void)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-
-	usb_power = 0;
-
-    /*LDO control*/
-#ifdef CONFIG_PMIC_MAX8698
-	if(!Set_MAX8698_PM_REG(ELDO3, 0) || !Set_MAX8698_PM_REG(ELDO8, 0))
-		printk("[FSA9480]%s : Fail to LDO OFF\n ", __func__);
-#elif defined(CONFIG_PMIC_MAX8906)
-	/* if(!Set_MAX8906_PM_REG(ELDO3, 0) || !Set_MAX8906_PM_REG(ELDO8, 0)) { */
-		printk("[FSA9480]%s : Fail to LDO OFF\n ", __func__);
-	/* } else { */
-	/* 	printk("[FSA9480]%s : Switched LDO OFF\n ", __func__); */
-	/* } */
-#else
-		printk("[FSA9480]%s : Fail to LDO OFF\n ", __func__);
-#endif
-
-}
-
-int fsa9480_read(struct i2c_client *client, u8 reg, u8 *data)
-{
-
-	int ret;
-	u8 buf[1];
-	struct i2c_msg msg[2];
-
-	buf[0] = reg; 
-
-	msg[0].addr = client->addr;
-	msg[0].flags = 0;
-	msg[0].len = 1;
-	msg[0].buf = buf;
-
-	msg[1].addr = client->addr;
-	msg[1].flags = I2C_M_RD;
-	msg[1].len = 1;
-	msg[1].buf = buf;
-
-	ret = i2c_transfer(client->adapter, msg, 2);
-	if (ret != 2) 
-		return -EIO;
-
-	*data = buf[0];
-	
-	return 0;
-}
-
-static int fsa9480_write(struct i2c_client *client, u8 reg, u8 data)
-{
-
-	int ret;
-	u8 buf[2];
-	struct i2c_msg msg[1];
-
-	buf[0] = reg;
-	buf[1] = data;
-
-	msg[0].addr = client->addr;
-	msg[0].flags = 0;
-	msg[0].len = 2;
-	msg[0].buf = buf;
-
-	ret = i2c_transfer(client->adapter, msg, 1);
-	if (ret != 1) 
-		return -EIO;
-
-	return 0;
-}
-
-
-/**********************************************************************
-*    Name         : fsa9480_modify()
-*    Description : used when modify fsa9480 register value via i2c
-*                        
-*    Parameter   : None
-*                       @ client : i2c client
-*                       @ reg : fsa9480 register's address
-*                       @ data : modified data
-*                       @ mask : mask bit
-*    Return        : None
-*
-***********************************************************************/
-static int fsa9480_modify(struct i2c_client *client, u8 reg, u8 data, u8 mask)
-{
-   u8 original_value, modified_value;
-
-   fsa9480_read(client, reg, &original_value);
-   DEBUG_FSA9480("[FSA9480] %s Original value is 0x%02x\n ",__func__, original_value);
-   modified_value = ((original_value&~mask)
-| data);
-   DEBUG_FSA9480("[FSA9480] %s modified value is 0x%02x\n ",__func__, modified_value);
-   fsa9480_write(client, reg, modified_value);
-
-   return 0;
-}
-
-//called by udc 
-/* UART <-> USB switch (for UART/USB JIG) */
-void fsa9480_check_usb_connection(void)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	u8 control, int1, deviceType1, deviceType2, manual1, manual2,pData,adc, carkitint1;
-	bool bInitConnect = false;
-
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_INTERRUPT1, &int1); // interrupt clear
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_DEVICETYPE1, &deviceType1);
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_ADC, &adc);
-
-	//in case of carkit we should process the extra interrupt. 1: attach interrupt, 2: carkit interrupt
-	//  (interrupt_cr3 & 0x0) case is when power on after TA is inserted.
-	if (((int1 & ATTACH) || !(int1 & 0x0)) && 
-		               (( deviceType1 & CRA_CARKIT) || adc == CEA936A_TYPE_1_CHARGER ))
-		{
-		DEBUG_FSA9480("[FSA9480] %s : Carkit is inserted! 1'st resolve insert interrupt\n ",__func__);
-		fsa9480_write(&fsa9480_i2c_client, REGISTER_CARKITSTATUS, 0x02);  //use only carkit charger
-
-		fsa9480_read(&fsa9480_i2c_client, REGISTER_CARKITINT1, &carkitint1);    // make INTB to high
-		DEBUG_FSA9480("[FSA9480] %s : Carkit int1 is 0x%02x\n ",__func__, carkitint1);
-
-
-		return;
-		}
-
-
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_CONTROL, &control);
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_INTERRUPT2, &pData); // interrupt clear
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_DEVICETYPE2, &deviceType2);
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_MANUALSW1, &manual1);
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_MANUALSW2, &manual2);
-
-	//DEBUG_FSA9480("[FSA9480] CONTROL is 0x%02x\n ",control);
-	DEBUG_FSA9480("[FSA9480] INTERRUPT1 is 0x%02x\n ",int1);
-	//DEBUG_FSA9480("[FSA9480] INTERRUPT2 is 0x%02x\n ",pData);
-	DEBUG_FSA9480("[FSA9480] DEVICETYPE1 is 0x%02x\n ",deviceType1);
-	//DEBUG_FSA9480("[FSA9480] DEVICETYPE2 is 0x%02x\n ",deviceType2);
-	DEBUG_FSA9480("[FSA9480] MANUALSW1 is 0x%02x\n ",manual1);
-	DEBUG_FSA9480("[FSA9480] MANUALSW2 is 0x%02x\n ",manual2);
-
-	/* TA Connection */
-	if(deviceType1 ==0x40)
-	{
-
-		wait_condition = 1;
-		ta_connection = true;
-		wake_up_interruptible(&usb_detect_waitq);
-
-		printk("[FSA9480] TA is connected \n");
-	}
-
-	
-	usb_state = (deviceType2 << 8) | (deviceType1 << 0);
-	
-	/* Disconnect cable */
-	if (deviceType1 == DEVICE_TYPE_NC && deviceType2 == DEVICE_TYPE_NC) {
-		ta_connection = false;
-		DEBUG_FSA9480("[FSA9480] Cable is not connected\n ");
-		if (usb_power == 1) 
-		{
-			/* reset manual2 s/w register */
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW2, 0x00);
-
-			/* auto mode settings */
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1E); 
-
-			/* power down mode */
-			s3c_udc_power_down();
-
-
-		return ;
-		}
-	}
-	
-	/* USB Detected */
-	if (deviceType1 == CRA_USB|| (deviceType2 & CRB_JIG_USB)) 
-	{ 
-
-		/* Manual Mode for USB */
-		DEBUG_FSA9480("[FSA9480] MANUAL MODE.. d1:0x%02x, d2:0x%02x\n", deviceType1, deviceType2);
-		if (control != 0x1A) 
-		{ 	
-			
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1A); 
-
-		}
-
-		/* reset manual2 s/w register */
-		manual2 &= ~(0x1f);
-
-		if(deviceType1 == CRA_USB)
-		{
-			/* ID Switching : ID connected to bypass port */
-			manual1 = 0x24;
-			manual2 |= 0x2;
-		}
-		else if(deviceType2 & CRB_JIG_USB_ON)
-		{	
-			/* BOOT_SW : High , JIG_ON : GND */
-			manual2 |= (0x1 << 3) | (0x1 << 2);
-
-
-		}
-		else if(deviceType2 & CRB_JIG_USB_OFF)
-		{
-			/* BOOT_SW : LOW , JIG_ON : GND */
-			manual2 |= (0x1 << 2);
-			
-		}
-
-		fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, manual1);
-		fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW2, manual2);
-
-
-
-		/* connect cable */
-
-		if(manual1 == 0x24 && usb_power !=1)
-		{
-			bInitConnect = true;
-			s3c_udc_power_up();
-			usb_power = 1;
-		}
-			
-	}
-	/* Auto mode settings */
-	else
-	{
-
-		/* Auto Mode except usb */
-		DEBUG_FSA9480("[FSA9480] AUTO MODE.. d1:0x%02x, d2:0x%02x\n", deviceType1, deviceType2);
-		if (control != 0x1E) 
-		{ 
-			fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1E);
-		
-		}
-
-
-	}
-
-	/* initialization driver */
-	if(usb_power == 2 && bInitConnect ==false )
-	{
-		fsa9480_s3c_udc_off();
-	}
-
-	
-
-}
-
-/* MODEM USB_SEL Pin control */
-/* 1 : PDA, 2 : MODEM */
-#define SWITCH_PDA			1
-#define SWITCH_MODEM		2
-static void usb_sel(int sel)
-{
-	DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	usb_path = sel;
-}
-
-/* for sysfs control (/sys/class/sec/switch/usb_sel) */
-static ssize_t usb_sel_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-	u8 i, pData;
-
-	sprintf(buf, "USB Switch : %s\n", usb_path==SWITCH_PDA?"PDA":"MODEM");
-
-//	sprintf(buf, "[USB Switch] fsa9480 register\n");
-    for(i = 0; i <= 0x14; i++) {
-		fsa9480_read(&fsa9480_i2c_client, i, &pData);
-//		sprintf(buf, "%s0x%02x = 0x%02x\n", buf, i, pData);
-	}
-//	sprintf(buf, "%s[USB Switch] fsa9480 register done\n", buf);
-
-	return sprintf(buf, "%s\n", buf);
-}
-
-void usb_switch_mode(int sel)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	if (sel == SWITCH_PDA)
-	{
-		DEBUG_FSA9480("[FSA9480] Path : PDA\n");
-		usb_sel(SWITCH_PDA);
-		fsa9480_write(&fsa9480_i2c_client, 0x13, 0x24); // PDA Port
-	} else if (sel == SWITCH_MODEM) 
-	{
-		DEBUG_FSA9480("[FSA9480] Path : MODEM\n");
-		usb_sel(SWITCH_MODEM);
-		fsa9480_write(&fsa9480_i2c_client, 0x13, 0x90); // V_Audio port (Modem USB)
-	} else
-		DEBUG_FSA9480("[FSA9480] Invalid mode...\n");
-}
-EXPORT_SYMBOL(usb_switch_mode);
-
-static ssize_t usb_sel_store(
-		struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t size)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	int switch_sel;
-
-	if (sec_get_param_value)
-		sec_get_param_value(__SWITCH_SEL, &switch_sel);
-
-	if(strncmp(buf, "PDA", 3) == 0 || strncmp(buf, "pda", 3) == 0) {
-		usb_switch_mode(SWITCH_PDA);
-		switch_sel |= USB_SEL_MASK;
-	}
-
-	if(strncmp(buf, "MODEM", 5) == 0 || strncmp(buf, "modem", 5) == 0) {
-		usb_switch_mode(SWITCH_MODEM);
-		switch_sel &= ~USB_SEL_MASK;
-}
-
-	if (sec_set_param_value)
-		sec_set_param_value(__SWITCH_SEL, &switch_sel);
-
-	return size;
-}
-
-static DEVICE_ATTR(usb_sel, S_IRUGO |S_IWUGO | S_IRUSR | S_IWUSR, usb_sel_show, usb_sel_store);
-
-
-
-/**********************************************************************
-*    Name         : usb_state_show()
-*    Description : for sysfs control (/sys/class/sec/switch/usb_state)
-*                        return usb state using fsa9480's device1 and device2 register
-*                        this function is used only when NPS want to check the usb cable's state.
-*    Parameter   :
-*                       
-*                       
-*    Return        : USB cable state's string
-*                        USB_STATE_CONFIGURED is returned if usb cable is connected
-***********************************************************************/
-static ssize_t usb_state_show(struct device *dev, struct device_attribute *attr, char *buf)
-{
-    int cable_state;
-
-	cable_state = get_usb_cable_state();
-
-	sprintf(buf, "%s\n", (cable_state & (CRB_JIG_USB<<8 | CRA_USB<<0 ))?"USB_STATE_CONFIGURED":"USB_STATE_NOTCONFIGURED");
-
-	return sprintf(buf, "%s\n", buf);
-} 
-
-
-/**********************************************************************
-*    Name         : usb_state_store()
-*    Description : for sysfs control (/sys/class/sec/switch/usb_state)
-*                        noting to do.
-*    Parameter   :
-*                       
-*                       
-*    Return        : None
-*
-***********************************************************************/
-static ssize_t usb_state_store(
-		struct device *dev, struct device_attribute *attr,
-		const char *buf, size_t size)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-
-
-	return 0;
-}
-
-/*sysfs for usb cable's state.*/
-static DEVICE_ATTR(usb_state, S_IRUGO |S_IWUGO | S_IRUSR | S_IWUSR, usb_state_show, usb_state_store);
-
-
-/* UART <-> USB switch (for UART/USB JIG) */
-static void mode_switch(struct work_struct *ignored)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	fsa9480_check_usb_connection();
-}
-
-static irqreturn_t fsa9480_interrupt(int irq, void *ptr)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-#if 0
-	DEBUG_FSA9480("### FSA9480 interrupt(%d) happened! ###\n", irq);
-	DEBUG_FSA9480("GPIO_JACK_INT_N value : %d\n", gpio_get_value(GPIO_JACK_INT_N));
-#endif
-	queue_work(fsa9480_workqueue, &fsa9480_work);
-
-	return IRQ_HANDLED; 
-}
-
-/* pm init check for MAX_Set*/
-void pm_check(void)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	if (available_PM_Set()) {
-#ifdef CONFIG_JET_OPTION
-		set_irq_type(IRQ_EINT(12), IRQ_TYPE_EDGE_FALLING);
-		if (request_irq(IRQ_EINT(12), fsa9480_interrupt, IRQF_DISABLED, "FSA9480 Detected", NULL))
-		{
-			DEBUG_FSA9480("[FSA9480]fail to register IRQ[%d] for FSA9480 USB Switch \n", IRQ_EINT(12));
-		}
-#else
-		set_irq_type(IRQ_EINT(9), IRQ_TYPE_EDGE_FALLING);
-		if (request_irq(IRQ_EINT(9), fsa9480_interrupt, IRQF_DISABLED, "FSA9480 Detected", NULL)) 
-		{
-			DEBUG_FSA9480("[FSA9480]fail to register IRQ[%d] for FSA9480 USB Switch \n", IRQ_EINT(9));
-		}
-#endif
-		queue_work(fsa9480_workqueue, &fsa9480_work);
-	} else {
-		fsa9480_init_timer.expires = get_jiffies_64()+10;
-		add_timer(&fsa9480_init_timer);
-	}
-}
-
-static int fsa9480_codec_probe(struct i2c_adapter *adap, int addr, int kind)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	int ret;
-	u8 pData;
-
-	init_waitqueue_head(&usb_detect_waitq); 
-	INIT_WORK(&fsa9480_work, mode_switch);
-	fsa9480_workqueue = create_singlethread_workqueue("fsa9480_workqueue");
-
-	if (device_create_file(switch_dev, &dev_attr_usb_sel) < 0)
-		DEBUG_FSA9480("[FSA9480]Failed to create device file(%s)!\n", dev_attr_usb_sel.attr.name);
-
-	if (device_create_file(switch_dev, &dev_attr_usb_state) < 0)
-		DEBUG_FSA9480("[FSA9480]Failed to create device file(%s)!\n", dev_attr_usb_state.attr.name);
-	
-	/* FSA9480 Interrupt */
-	s3c_gpio_cfgpin(GPIO_JACK_INT_N, S3C_GPIO_SFN(GPIO_JACK_INT_N_AF));
-	s3c_gpio_setpull(GPIO_JACK_INT_N, S3C_GPIO_PULL_NONE);
-
-	fsa9480_i2c_client.adapter = adap;
-	fsa9480_i2c_client.addr = addr;
-
-	ret = i2c_attach_client(&fsa9480_i2c_client);
-	if (ret < 0) {
-		DEBUG_FSA9480("[FSA9480]failed to attach codec at addr %x\n", addr);
-		return -1;
-	}
-
-	/*init wakelock*/
-	wake_lock_init(&fsa9480_wake_lock, WAKE_LOCK_SUSPEND, "fsa9480_wakelock");
-
-    /*clear interrupt mask register*/
-    fsa9480_modify(&fsa9480_i2c_client,REGISTER_CONTROL,~INT_MASK, INT_MASK);
-	
-	fsa9480_read(&fsa9480_i2c_client, 0x13, &pData);
-	if (pData == 0x24) // PDA
-		usb_path = SWITCH_PDA;	
-	else
-		usb_path = SWITCH_MODEM;	
-
-	usb_sel(usb_path);
-
-	init_timer(&fsa9480_init_timer);
-	fsa9480_init_timer.function = (void*) pm_check;
-
-	pm_check();
-
-	return 0;
-}
-
-static int fsa9480_i2c_attach(struct i2c_adapter *adap)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	return i2c_probe(adap, &fsa9480_addr_data, fsa9480_codec_probe);
-}
-
-static int fsa9480_i2c_detach(struct i2c_client *client)
-{
-	DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	i2c_detach_client(client);
-
-	wake_lock_destroy(&fsa9480_wake_lock);
-	return 0;
-}
-
-static int fsa9480_i2c_resume(void)
-{
-   DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-   
-   if(ftm_sleep == 1)
-   	{
-   	/*set auto mode in case of ftm_sleep and wake lock*/
-   	wake_lock(&fsa9480_wake_lock);
-	
-   	DEBUG_FSA9480("[FSA9480]%s ftm sleep is on fsa9480_SetAutoSWMode is called \n ", __func__);
-   	fsa9480_SetAutoSWMode();
-
-	//wait 15 seconds
-    wake_lock_timeout(&fsa9480_wake_lock, 15*HZ);
-   	}
-   
-   return 0;
-}
-
-/* corgi i2c codec control layer */
-static struct i2c_driver fsa9480_i2c_driver = {
-	.driver = {
-		.name = "fsa9480 I2C Codec",
-		.owner = THIS_MODULE,
-	},
-	.id =             0,
-	.attach_adapter = fsa9480_i2c_attach,
-	.detach_client =  fsa9480_i2c_detach,
-	.command =        NULL,
-	.resume =         fsa9480_i2c_resume,
-};
-
-static struct i2c_client fsa9480_i2c_client = {
-	.name =   "fsa9480",
-	.driver = &fsa9480_i2c_driver,
-};
-
-
-
-//SEC_BSP_WONSUK_20090810 : Add the codes related SLEEP CMD in factory process
-/*================================================
-	When DIAG SLEEP command arrived, UART RXD, TXD port make disable
-	because CP could not enter the sleep mode due to the UART floating voltage.
-================================================*/
-
-
-/**********************************************************************
-*    Name         : fsa9480_SetManualSW()
-*    Description : Control FSA9480's Manual SW1 and SW2
-*                        
-*    Parameter   :
-*                       @ valManualSw1 : the value to set SW1
-*                       @ valManualSw2 : the value to set SW2
-*    Return        : None
-*
-***********************************************************************/
-void fsa9480_SetManualSW(unsigned char valManualSw1, unsigned char valManualSw2)
-{
-    DEBUG_FSA9480("[FSA9480]%s \n", __func__);
-	unsigned char cont_reg, man_sw1, man_sw2;
-
-    /*Set Manual switch*/
-	fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW1, valManualSw1);
-	mdelay(20);
-	
-	fsa9480_write(&fsa9480_i2c_client, REGISTER_MANUALSW2, valManualSw2);
-	mdelay(20);
-
-
-	/*when detached the cable, Control register automatically be restored.*/
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_CONTROL, &cont_reg);
-	mdelay(20);
-	DEBUG_FSA9480("[FSA9480] fsa9480_SetManualSW : [Before]Control Register's value is %s\n",&cont_reg);
-
-	/*set switching mode to MANUAL*/
-	fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1A);
-
-
-	/* Read current setting value , manual sw1, manual sw2, control register.*/
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_MANUALSW1, &man_sw1);
-	mdelay(20);
-	DEBUG_FSA9480("[FSA9480] fsa9480_SetManualSW : Manual SW1 Register's value is %s\n",&man_sw1);
-
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_MANUALSW2, &man_sw2);
-	mdelay(20);
-	DEBUG_FSA9480("[FSA9480] fsa9480_SetManualSW : Manual SW2 Register's value is %s\n",&man_sw2);
-
-	fsa9480_read(&fsa9480_i2c_client, REGISTER_CONTROL, &cont_reg);
-	DEBUG_FSA9480("[FSA9480] fsa9480_SetManualSW : [After]Control Register's value is %s\n",&cont_reg);
-}
-
-
-
-/**********************************************************************
-*    Name         : fsa9480_SetAutoSWMode()
-*    Description : Set FSA9480 with Auto Switching Mode.
-*                        
-*    Parameter   : None
-*                       @ 
-*                       @ 
-*    Return        : None
-*
-***********************************************************************/
-void fsa9480_SetAutoSWMode(void)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	unsigned char cont_reg=0xff;
-
-	/*set Auto Swithing mode */
-	fsa9480_write(&fsa9480_i2c_client, REGISTER_CONTROL, 0x1E);
-}
-
-
-/**********************************************************************
-*    Name         : fsa9480_MakeRxdLow()
-*    Description : Make UART port to OPEN state.
-*                        
-*    Parameter   : None
-*                       @ 
-*                       @ 
-*    Return        : None
-*
-***********************************************************************/
-void fsa9480_MakeRxdLow(void)
-{
-    DEBUG_FSA9480("[FSA9480]%s\n ", __func__);
-	unsigned char hidden_reg;
-	
-	fsa9480_write(&fsa9480_i2c_client, HIDDEN_REGISTER_MANUAL_OVERRDES1, 0x0a); 
-	mdelay(20);
-	fsa9480_read(&fsa9480_i2c_client, HIDDEN_REGISTER_MANUAL_OVERRDES1, &hidden_reg);
-	fsa9480_SetManualSW(0x00, 0x00);
-}
-
-
-EXPORT_SYMBOL(fsa9480_SetManualSW);
-EXPORT_SYMBOL(fsa9480_SetAutoSWMode);
-EXPORT_SYMBOL(fsa9480_MakeRxdLow);
 
 

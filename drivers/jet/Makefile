@@ -21,3 +21,10 @@ obj-$(CONFIG_VIBETONZ)		+= vibetonz/
 obj-$(CONFIG_WLAN)		+= wlan/
 #obj-$(CONFIG_RFS_XSR)		+= xsr/
 #obj-$(CONFIG_CAMERA)		+= camera/
+obj-$(CONFIG_VIDEO_FIMC)	+= fimc/
+#obj-$(CONFIG_JPEG_V2)		+= jpeg_v2/
+obj-$(CONFIG_VIDEO_SCALER)      += scaler/
+obj-$(CONFIG_VIDEO_TVOUT)	+= tvout/
+obj-$(CONFIG_VIDEO_TSI)		+= tsi/
+
+

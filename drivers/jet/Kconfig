@@ -1,64 +1,81 @@
-#
-#
-#
+menuconfig JET_DRIVERS
+	bool "Jet Drivers"
+        default y
+	---help---
+	  This is a configuration for JET drivers.
 
-
-menuconfig JET
-	bool "JetDroid Drivers"
-	help
-          Say Y to enable Jet drivers.  This allows control of supported
-	  Jet drivers.
-
-if JET
+if JET_DRIVERS
 
 source "drivers/jet/btgpio/Kconfig"
 source "drivers/jet/cmm/Kconfig"
 source "drivers/jet/dpram/Kconfig"
-#source "drivers/jet/dpram_recovery/Kconfig"
 source "drivers/jet/g2d/Kconfig"
 source "drivers/jet/g3d/Kconfig"
 source "drivers/jet/jpeg/Kconfig"
 source "drivers/jet/mfc/Kconfig"
 source "drivers/jet/multipdp/Kconfig"
-#source "drivers/jet/param/Kconfig"
 source "drivers/jet/pp/Kconfig"
-#source "drivers/jet/pp/Kconfig"
-#source "drivers/jet/rfs/Kconfig"
-#source "drivers/jet/rotator/Kconfig"
 source "drivers/jet/vibetonz/Kconfig"
-#source "drivers/jet/param/Kconfig"
 source "drivers/jet/wlan/Kconfig"
-#source "drivers/jet/xsr/Kconfig"
-#source "drivers/jet/camera/Kconfig"
+source "drivers/jet/fimc/Kconfig"
+source "drivers/jet/scaler/Kconfig"
+source "drivers/jet/tvout/Kconfig"
 
 comment "Reserved memory configurations"
 
-config VIDEO_SAMSUNG_MEMSIZE_FIMC
+config SAMSUNG_MEMSIZE_FIMC
 	int "Memory size in kbytes for FIMC"
 	depends on VIDEO_FIMC
-	default "10240"
+	default "5120"
 
-config SAMSUNG_MEMSIZE_PP
+config SAMSUNG_MEMSIZE_POST
 	int "Memory size in kbytes for Post Processor"
-	depends on POST
+	depends on VIDEO_POST
 	default "8192"
 
 config SAMSUNG_MEMSIZE_TV
 	int "Memory size in kbytes for TV"
-	depends on TV
+	depends on VIDEO_TV
 	default "8192"
 
 if CPU_S3C6410
 config SAMSUNG_MEMSIZE_MFC
 	int "Memory size in kbytes for MFC"
-	depends on MFC
-	default "6144"
+	depends on VIDEO_MFC40
+	default "32768"
 
 config SAMSUNG_MEMSIZE_JPEG
 	int "Memory size in kbytes for JPEG"
-	depends on JPEG 
-	default "4096"
+	depends on VIDEO_JPEG_V2 
+	default "32768"
 endif
 
-endif # JET
+#config SAMSUNG_MEMSIZE_FIMC
+#	int "Memory size in kbytes for FIMC"
+#	depends on VIDEO_FIMC
+#	default "10240"
+
+#config SAMSUNG_MEMSIZE_PP
+#	int "Memory size in kbytes for Post Processor"
+#	depends on POST
+#	default "8192"
+
+#config SAMSUNG_MEMSIZE_TV
+#	int "Memory size in kbytes for TV"
+#	depends on TV
+#	default "8192"
+
+#if CPU_S3C6410
+#config SAMSUNG_MEMSIZE_MFC
+#	int "Memory size in kbytes for MFC"
+#	depends on MFC
+#	default "6144"
+
+#config SAMSUNG_MEMSIZE_JPEG
+#	int "Memory size in kbytes for JPEG"
+#	depends on JPEG 
+#	default "4096"
+#endif
+
+endif # JET_DRIVERS
 

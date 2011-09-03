@@ -1,0 +1,13 @@
+#
+# Makefile for TVout device driver designed by Samsung Electronics 2007
+#
+##menu "VIDEO TVOUT"
+
+config VIDEO_TVOUT
+        bool "SAMSUNG TV-out device support"
+        depends on CPU_S3C6410
+        default y
+	help
+	    TVOUT
+#endmenu
+

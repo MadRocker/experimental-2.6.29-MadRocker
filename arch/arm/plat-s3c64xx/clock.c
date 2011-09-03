@@ -64,14 +64,14 @@ static const u32 s3c_cpu_clk_tab_533MHz[][6] = {
 
 /* ARMCLK, HCLKX2, APLL, PDIV, ARM_DIV, HCLKX2_DIV */
 static const u32 s3c_cpu_clk_tab_800MHz[][6] = {
-	{800*MHZ,  266 *MHZ, 400, 3, 0, 2},
-	{400*MHZ,  266 *MHZ, 400, 3, 1, 2},
-	{266*MHZ,  266 *MHZ, 400, 3, 2, 2},
-	{133*MHZ,  266 *MHZ, 400, 3, 5, 2},
+	{800*MHZ,  266 *MHZ, 400, 7, 0, 2},
+	{400*MHZ,  266 *MHZ, 400, 7, 1, 2},
+	{266*MHZ,  266 *MHZ, 400, 7, 2, 2},
+	{133*MHZ,  266 *MHZ, 400, 7, 5, 2},
 #ifdef USE_DVFS_AL1_LEVEL
-	{133*MHZ,  133 *MHZ, 400, 1, 5, 5},
+	{133*MHZ,  133 *MHZ, 400, 3, 5, 5},
 #endif /* USE_DVFS_AL1_LEVEL */
-	{ 66*MHZ,  133 *MHZ, 400, 1, 11, 5},
+	{ 66*MHZ,  133 *MHZ, 400, 3, 11, 5},
 };
 
 unsigned int S3C64XX_FREQ_TAB = 0;

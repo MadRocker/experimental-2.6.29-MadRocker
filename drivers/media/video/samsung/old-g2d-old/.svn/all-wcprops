@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/!svn/ver/424/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/g2d
+END
+Kconfig
+K 25
+svn:wc:ra_dav:version-url
+V 89
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/g2d/Kconfig
+END
+fimg2d3x.c
+K 25
+svn:wc:ra_dav:version-url
+V 92
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/g2d/fimg2d3x.c
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 90
+/svn/!svn/ver/307/trunk/kernel-src/linux-2.6.32.9/drivers/media/video/samsung/g2d/Makefile
+END

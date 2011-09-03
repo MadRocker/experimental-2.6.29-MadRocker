@@ -1,0 +1,22 @@
+#
+## TSI configuration
+##
+#
+
+config VIDEO_TSI
+	bool "SAMSUNG TSI Driver" 
+        depends on CPU_S3C6410
+	default y
+	help
+	   S3C_TSI
+
+config VIDEO_TSI_DEBUG
+	bool "print TSI debug message"
+	depends on VIDEO_TSI
+	default y
+
+config VIDEO_LIST_DEBUG
+	bool "print TSI list debug message"
+	depends on VIDEO_TSI
+	default y
+
